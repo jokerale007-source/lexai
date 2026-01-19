@@ -4,9 +4,79 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>LexAI</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #ffffff;
+      padding: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+    main {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+    .card {
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .resultado {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>LexAI – Página en construcción</h1>
-  <p>Si estás viendo esto, GitHub Pages ya está funcionando.</p>
+
+<header>
+  <h2>LexAI</h2>
+  <p>Buscador de resoluciones – Contratación Pública Costa Rica</p>
+</header>
+
+<main>
+
+  <div class="card">
+    <label><strong>Consulta</strong></label><br>
+    <input type="text" placeholder="Ejemplo: feriados, experiencia, pyme…" />
+    <button>Buscar</button>
+  </div>
+
+  <div class="card">
+    <h3>Resultados</h3>
+    <p>Aquí se mostrarán las resoluciones encontradas.</p>
+
+    <div class="resultado">
+      <strong>Resolución R-DCA-0000-2024</strong><br>
+      Institución: CCSS<br>
+      Año: 2024<br>
+      <em>Este es un ejemplo de cómo se verá un resultado.</em>
+    </div>
+
+  </div>
+
+</main>
+
 </body>
 </html>
