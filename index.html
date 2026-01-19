@@ -111,7 +111,7 @@
       font-size: 12px;
       padding: 4px 8px;
       border-radius: 999px;
-      background: #f1f1f1;
+      background: #f1f4f8;
       border: 1px solid #e0e0e0;
       margin-right: 6px;
       margin-top: 6px;
@@ -201,11 +201,7 @@
   /***********************
    * CONFIGURACIÓN
    ***********************/
-  // 1) Pega aquí el Production URL del Webhook de n8n (sin parámetros)
-  // Ejemplo: https://TU_DOMINIO_N8N/webhook/lexai-query
   const N8N_WEBHOOK_URL = "https://napiercr.app.n8n.cloud/webhook/lexai-query";
-
-  // 2) Tamaño de página (tú definiste max 5)
   const PAGE_SIZE = 5;
 
   /***********************
@@ -231,9 +227,6 @@
   const btnClear = document.getElementById("btnClear");
   const btnMore = document.getElementById("btnMore");
 
-  /***********************
-   * UTILIDADES
-   ***********************/
   function setBusy(busy) {
     btnSearch.disabled = busy;
     btnMore.disabled = busy;
@@ -253,7 +246,6 @@
     lastQuery = "";
     offset = 0;
     countTotal = 0;
-
     elStatus.textContent = "";
     elErr.textContent = "";
     elResumen.innerHTML = "Aún no hay resultados.";
@@ -261,7 +253,6 @@
     elResultados.innerHTML = "";
     elMoreBox.style.display = "none";
     elMoreMeta.textContent = "";
-
     elQ.value = "";
     elQ.focus();
   }
@@ -280,16 +271,13 @@
 
   function normalizeTags(tags) {
     if (!tags) return [];
-    // Soporta "A | B | C" o "A|B|C"
     return tags.split("|").map(t => t.trim()).filter(Boolean);
   }
 
   function renderItem(it) {
     const div = document.createElement("div");
     div.className = "res-item";
-
     const tags = normalizeTags(it.tags);
-    const url = it.download_url ? esc(it.download_url) : "";
 
     div.innerHTML = `
       <div class="res-title">Número de resolución: ${esc(it.numero_resolucion || "")}</div>
@@ -313,53 +301,35 @@
 
       <div class="field-title">Documento</div>
       <div>
-        ${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>` : `<span class="muted">Sin enlace</span>`}
+        ${it.download_url ? `<a href="${esc(it.download_url)}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>` : `<span class="muted">Sin enlace</span>`}
       </div>
     `;
     return div;
   }
 
-  /***********************
-   * LLAMADA A N8N
-   ***********************/
   async function callApi(query, offset, limit) {
-    if (!N8N_WEBHOOK_URL || N8N_WEBHOOK_URL.includes("https://napiercr.app.n8n.cloud/webhook/lexai-query")) {
-      throw new Error("Falta configurar N8N_WEBHOOK_URL en el archivo index.html.");
-    }
-
     const url = new URL(N8N_WEBHOOK_URL);
     url.searchParams.set("query", query);
     url.searchParams.set("offset", String(offset));
     url.searchParams.set("limit", String(limit));
 
     const res = await fetch(url.toString(), { method: "GET" });
-
-    // Si el servidor responde con error HTTP:
     if (!res.ok) {
-      throw new Error(`El Webhook respondió con HTTP ${res.status}.`);
+      throw new Error(`HTTP ${res.status}`);
     }
-
-    // Debe ser JSON
     const data = await res.json();
-
-    // Si tu contrato usa ok:false:
     if (data.ok === false) {
       throw new Error(data.error || "Error desconocido desde n8n.");
     }
-
     return data;
   }
 
-  /***********************
-   * BUSCAR / MÁS RESULTADOS
-   ***********************/
   async function runSearch(isMore) {
     elErr.textContent = "";
     elStatus.textContent = "";
 
     const query = (elQ.value || "").trim();
 
-    // Reset si es búsqueda nueva
     if (!isMore) {
       elResultados.innerHTML = "";
       offset = 0;
@@ -381,8 +351,6 @@
     try {
       const data = await callApi(qToUse, offset, PAGE_SIZE);
 
-      // Contrato esperado:
-      // { count_total, returned, offset, limit, has_more, items[] }
       const total = Number(data.count_total ?? 0);
       const returned = Number(data.returned ?? (Array.isArray(data.items) ? data.items.length : 0));
       const hasMore = Boolean(data.has_more);
@@ -396,10 +364,8 @@
       const items = Array.isArray(data.items) ? data.items : [];
       items.forEach(it => elResultados.appendChild(renderItem(it)));
 
-      // Actualiza offset para la siguiente página
       offset = Number(data.offset ?? offset) + returned;
 
-      // Paginación UI
       elMoreBox.style.display = hasMore ? "block" : "none";
       elMoreMeta.textContent = `Mostrando ${Math.min(offset, countTotal)} de ${countTotal}.`;
 
@@ -413,9 +379,6 @@
     }
   }
 
-  /***********************
-   * EVENTOS UI
-   ***********************/
   btnSearch.addEventListener("click", () => runSearch(false));
   btnMore.addEventListener("click", () => runSearch(true));
   btnClear.addEventListener("click", clearAll);
@@ -423,7 +386,6 @@
     if (e.key === "Enter") runSearch(false);
   });
 
-  // Estado inicial
   clearAll();
 </script>
 
