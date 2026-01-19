@@ -11,72 +11,421 @@
       background: #f5f6f8;
       margin: 0;
       padding: 0;
+      color: #111;
     }
     header {
       background: #ffffff;
-      padding: 20px;
+      padding: 18px 20px;
       border-bottom: 1px solid #ddd;
     }
-    main {
-      max-width: 900px;
-      margin: 30px auto;
-      padding: 0 20px;
+    header h2 {
+      margin: 0;
+      font-size: 20px;
     }
+    header p {
+      margin: 6px 0 0 0;
+      color: #666;
+      font-size: 13px;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 24px auto;
+      padding: 0 20px 40px 20px;
+    }
+
     .card {
       background: #ffffff;
-      padding: 20px;
+      padding: 18px;
       border-radius: 10px;
-      margin-bottom: 20px;
       border: 1px solid #ddd;
+      margin-bottom: 16px;
     }
-    input {
-      width: 100%;
+
+    label {
+      font-size: 12px;
+      color: #444;
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      min-width: 260px;
       padding: 12px;
-      font-size: 16px;
-      margin-bottom: 10px;
+      font-size: 15px;
+      border-radius: 10px;
+      border: 1px solid #cfcfcf;
+      outline: none;
     }
+
     button {
-      padding: 10px 16px;
-      font-size: 16px;
+      padding: 12px 16px;
+      font-size: 15px;
+      border-radius: 10px;
+      border: 1px solid #111;
+      background: #111;
+      color: #fff;
       cursor: pointer;
     }
-    .resultado {
-      margin-top: 15px;
-      padding-top: 10px;
-      border-top: 1px solid #ddd;
+
+    button.secondary {
+      background: #fff;
+      color: #111;
+      border: 1px solid #cfcfcf;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .meta {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .error {
+      color: #b42318;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .section-title {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .pill {
+      display: inline-block;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f1f1f1;
+      border: 1px solid #e0e0e0;
+      margin-right: 6px;
+      margin-top: 6px;
+    }
+
+    .res-item {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .res-title {
+      font-weight: bold;
+      margin: 0 0 6px 0;
+      font-size: 15px;
+    }
+
+    .field-title {
+      font-weight: bold;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    a {
+      color: #0b5fff;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+
+    .muted { color:#6b7280; }
+
+    .footer-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
   </style>
 </head>
 
 <body>
-
 <header>
   <h2>LexAI</h2>
-  <p>Buscador de resoluciones – Contratación Pública Costa Rica</p>
+  <p>Buscador de resoluciones – Contratación Pública / CGR (Costa Rica)</p>
 </header>
 
 <main>
 
+  <!-- Buscador -->
   <div class="card">
-    <label><strong>Consulta</strong></label><br>
-    <input type="text" placeholder="Ejemplo: feriados, experiencia, pyme…" />
-    <button>Buscar</button>
-  </div>
-
-  <div class="card">
-    <h3>Resultados</h3>
-    <p>Aquí se mostrarán las resoluciones encontradas.</p>
-
-    <div class="resultado">
-      <strong>Resolución R-DCA-0000-2024</strong><br>
-      Institución: CCSS<br>
-      Año: 2024<br>
-      <em>Este es un ejemplo de cómo se verá un resultado.</em>
+    <label for="q">Consulta</label>
+    <div class="row">
+      <input id="q" type="text" placeholder="Ejemplo: feriados, experiencia, pyme…" />
+      <button id="btnSearch">Buscar</button>
+      <button id="btnClear" class="secondary">Limpiar</button>
     </div>
 
+    <div id="status" class="meta"></div>
+    <div id="err" class="error"></div>
+  </div>
+
+  <!-- Resultados -->
+  <div class="card">
+    <div class="section-title">Respuesta</div>
+
+    <div id="resumen" class="meta muted">Aún no hay resultados.</div>
+
+    <div style="margin-top:12px;">
+      <div class="section-title">Resoluciones relevantes</div>
+      <div id="conteo" class="meta muted">Cantidad de resoluciones encontradas: 0</div>
+      <div id="resultados"></div>
+    </div>
+  </div>
+
+  <!-- Más resultados -->
+  <div class="card" id="moreBox" style="display:none;">
+    <div class="footer-actions">
+      <div class="meta" id="moreMeta"></div>
+      <button id="btnMore" class="secondary">Más resultados</button>
+    </div>
   </div>
 
 </main>
+
+<script>
+  /***********************
+   * CONFIGURACIÓN
+   ***********************/
+  // 1) Pega aquí el Production URL del Webhook de n8n (sin parámetros)
+  // Ejemplo: https://TU_DOMINIO_N8N/webhook/lexai-query
+  const N8N_WEBHOOK_URL = "https://napiercr.app.n8n.cloud/webhook/lexai-query";
+
+  // 2) Tamaño de página (tú definiste max 5)
+  const PAGE_SIZE = 5;
+
+  /***********************
+   * ESTADO
+   ***********************/
+  let lastQuery = "";
+  let offset = 0;
+  let countTotal = 0;
+
+  /***********************
+   * ELEMENTOS UI
+   ***********************/
+  const elQ = document.getElementById("q");
+  const elStatus = document.getElementById("status");
+  const elErr = document.getElementById("err");
+  const elResumen = document.getElementById("resumen");
+  const elConteo = document.getElementById("conteo");
+  const elResultados = document.getElementById("resultados");
+  const elMoreBox = document.getElementById("moreBox");
+  const elMoreMeta = document.getElementById("moreMeta");
+
+  const btnSearch = document.getElementById("btnSearch");
+  const btnClear = document.getElementById("btnClear");
+  const btnMore = document.getElementById("btnMore");
+
+  /***********************
+   * UTILIDADES
+   ***********************/
+  function setBusy(busy) {
+    btnSearch.disabled = busy;
+    btnMore.disabled = busy;
+    btnClear.disabled = busy;
+  }
+
+  function esc(s) {
+    return (s ?? "").toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function clearAll() {
+    lastQuery = "";
+    offset = 0;
+    countTotal = 0;
+
+    elStatus.textContent = "";
+    elErr.textContent = "";
+    elResumen.innerHTML = "Aún no hay resultados.";
+    elConteo.textContent = "Cantidad de resoluciones encontradas: 0";
+    elResultados.innerHTML = "";
+    elMoreBox.style.display = "none";
+    elMoreMeta.textContent = "";
+
+    elQ.value = "";
+    elQ.focus();
+  }
+
+  function renderExecutiveSummary(query, total) {
+    if (total > 0) {
+      elResumen.innerHTML = `Se encontraron <b>${total}</b> resoluciones relevantes para “<b>${esc(query)}</b>”.`;
+    } else {
+      elResumen.innerHTML = `No se encontraron resoluciones relevantes para “<b>${esc(query)}</b>”.`;
+    }
+  }
+
+  function renderCount(total) {
+    elConteo.innerHTML = `Cantidad de resoluciones encontradas: <b>${esc(total)}</b>`;
+  }
+
+  function normalizeTags(tags) {
+    if (!tags) return [];
+    // Soporta "A | B | C" o "A|B|C"
+    return tags.split("|").map(t => t.trim()).filter(Boolean);
+  }
+
+  function renderItem(it) {
+    const div = document.createElement("div");
+    div.className = "res-item";
+
+    const tags = normalizeTags(it.tags);
+    const url = it.download_url ? esc(it.download_url) : "";
+
+    div.innerHTML = `
+      <div class="res-title">Número de resolución: ${esc(it.numero_resolucion || "")}</div>
+
+      <div class="meta">
+        <span class="pill">Institución: ${esc(it.institucion || "")}</span>
+        <span class="pill">Procedimiento: ${esc(it.numero_procedimiento || "")}</span>
+        <span class="pill">Año: ${esc(it.anio || "")}</span>
+      </div>
+
+      <div class="field-title">Resumen</div>
+      <div>${esc(it.summary || "")}</div>
+
+      <div class="field-title">Conclusión final</div>
+      <div>${esc(it.final_conclusion || "")}</div>
+
+      <div class="field-title">Etiquetas</div>
+      <div>
+        ${tags.length ? tags.map(t => `<span class="pill">${esc(t)}</span>`).join("") : `<span class="muted">Sin etiquetas</span>`}
+      </div>
+
+      <div class="field-title">Documento</div>
+      <div>
+        ${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>` : `<span class="muted">Sin enlace</span>`}
+      </div>
+    `;
+    return div;
+  }
+
+  /***********************
+   * LLAMADA A N8N
+   ***********************/
+  async function callApi(query, offset, limit) {
+    if (!N8N_WEBHOOK_URL || N8N_WEBHOOK_URL.includes("https://napiercr.app.n8n.cloud/webhook/lexai-query")) {
+      throw new Error("Falta configurar N8N_WEBHOOK_URL en el archivo index.html.");
+    }
+
+    const url = new URL(N8N_WEBHOOK_URL);
+    url.searchParams.set("query", query);
+    url.searchParams.set("offset", String(offset));
+    url.searchParams.set("limit", String(limit));
+
+    const res = await fetch(url.toString(), { method: "GET" });
+
+    // Si el servidor responde con error HTTP:
+    if (!res.ok) {
+      throw new Error(`El Webhook respondió con HTTP ${res.status}.`);
+    }
+
+    // Debe ser JSON
+    const data = await res.json();
+
+    // Si tu contrato usa ok:false:
+    if (data.ok === false) {
+      throw new Error(data.error || "Error desconocido desde n8n.");
+    }
+
+    return data;
+  }
+
+  /***********************
+   * BUSCAR / MÁS RESULTADOS
+   ***********************/
+  async function runSearch(isMore) {
+    elErr.textContent = "";
+    elStatus.textContent = "";
+
+    const query = (elQ.value || "").trim();
+
+    // Reset si es búsqueda nueva
+    if (!isMore) {
+      elResultados.innerHTML = "";
+      offset = 0;
+      countTotal = 0;
+    }
+
+    const qToUse = isMore ? lastQuery : query;
+
+    if (!qToUse) {
+      elErr.textContent = "Escriba una consulta.";
+      return;
+    }
+
+    if (!isMore) lastQuery = qToUse;
+
+    setBusy(true);
+    elStatus.textContent = isMore ? "Cargando más resultados…" : "Buscando…";
+
+    try {
+      const data = await callApi(qToUse, offset, PAGE_SIZE);
+
+      // Contrato esperado:
+      // { count_total, returned, offset, limit, has_more, items[] }
+      const total = Number(data.count_total ?? 0);
+      const returned = Number(data.returned ?? (Array.isArray(data.items) ? data.items.length : 0));
+      const hasMore = Boolean(data.has_more);
+
+      if (!isMore) {
+        countTotal = total;
+        renderExecutiveSummary(qToUse, countTotal);
+        renderCount(countTotal);
+      }
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      items.forEach(it => elResultados.appendChild(renderItem(it)));
+
+      // Actualiza offset para la siguiente página
+      offset = Number(data.offset ?? offset) + returned;
+
+      // Paginación UI
+      elMoreBox.style.display = hasMore ? "block" : "none";
+      elMoreMeta.textContent = `Mostrando ${Math.min(offset, countTotal)} de ${countTotal}.`;
+
+      elStatus.textContent = hasMore ? "Listo." : "Listo. No hay más resultados.";
+    } catch (e) {
+      elErr.textContent = e?.message || String(e);
+      elStatus.textContent = "";
+      elMoreBox.style.display = "none";
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /***********************
+   * EVENTOS UI
+   ***********************/
+  btnSearch.addEventListener("click", () => runSearch(false));
+  btnMore.addEventListener("click", () => runSearch(true));
+  btnClear.addEventListener("click", clearAll);
+  elQ.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runSearch(false);
+  });
+
+  // Estado inicial
+  clearAll();
+</script>
 
 </body>
 </html>
