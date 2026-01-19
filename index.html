@@ -6,180 +6,310 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f6f7f9;
-      margin: 0;
-      padding: 0;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: 40px auto;
-      background: #fff;
-      padding: 24px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.1);
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    .search-box {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-
-    input[type="text"] {
-      flex: 1;
-      padding: 10px;
-      font-size: 16px;
-    }
-
-    button {
-      padding: 10px 16px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .result {
-      border-top: 1px solid #ddd;
-      padding: 16px 0;
-    }
-
-    .meta {
-      font-size: 14px;
-      color: #555;
-    }
-
-    .tags {
-      margin-top: 6px;
-      font-size: 13px;
-      color: #0a6;
-    }
-
-    .error {
-      color: red;
-      font-weight: bold;
-    }
-
-    .more-btn {
-      margin-top: 20px;
-    }
+    body { font-family: Arial, sans-serif; background:#f6f7f9; margin:0; padding:0; }
+    .container { max-width: 950px; margin: 40px auto; background:#fff; padding: 24px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { margin: 0 0 14px 0; font-size: 22px; }
+    .sub { margin: 0 0 18px 0; color:#666; font-size: 13px; }
+    .search-box { display:flex; gap:8px; margin-bottom: 12px; flex-wrap: wrap; }
+    input[type="text"] { flex: 1; min-width: 240px; padding: 12px; font-size: 16px; border:1px solid #d0d5dd; border-radius: 10px; outline: none; }
+    button { padding: 12px 16px; font-size: 15px; cursor: pointer; border-radius: 10px; border: 1px solid #111; background:#111; color:#fff; }
+    button.secondary { background:#fff; color:#111; border:1px solid #d0d5dd; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .status { margin: 8px 0 0 0; font-size: 13px; color:#444; }
+    .error { margin: 8px 0 0 0; color:#b42318; font-size: 13px; font-weight: bold; }
+    .card { margin-top: 18px; border:1px solid #eee; border-radius: 10px; padding: 14px; }
+    .section-title { font-weight: bold; margin: 0 0 8px 0; }
+    .result { border-top: 1px solid #eee; padding: 14px 0; }
+    .result:first-child { border-top: none; padding-top: 0; }
+    .meta { font-size: 13px; color:#555; margin-bottom: 6px; }
+    .tags { margin-top: 8px; font-size: 12px; color:#0a6; }
+    a { color: #0b5fff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    pre { background:#f7f7f7; padding:10px; border-radius:8px; overflow:auto; font-size: 12px; }
+    .footer-actions { margin-top: 14px; display:flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .muted { color:#6b7280; font-size: 12px; }
   </style>
 </head>
 
 <body>
   <div class="container">
     <h1>LexAI – Resoluciones de Contratación Pública</h1>
+    <p class="sub">Buscador de resoluciones (CGR / contratación pública). Escriba un tema y consulte.</p>
 
     <div class="search-box">
       <input id="queryInput" type="text" placeholder="Ej: feriados, pyme, experiencia…" />
-      <button onclick="startSearch()">Buscar</button>
+      <button id="btnSearch" onclick="startSearch()">Buscar</button>
+      <button id="btnClear" class="secondary" onclick="clearAll()">Limpiar</button>
     </div>
 
-    <div id="status"></div>
-    <div id="results"></div>
+    <div id="status" class="status"></div>
+    <div id="err" class="error"></div>
 
-    <button id="moreBtn" class="more-btn" onclick="loadMore()" style="display:none;">
-      Más resultados
-    </button>
+    <div class="card">
+      <div class="section-title">Respuesta</div>
+      <div id="summary" class="muted">Aún no hay resultados.</div>
+
+      <div style="margin-top: 14px;">
+        <div class="section-title">Resoluciones relevantes</div>
+        <div id="count" class="muted">Cantidad de resoluciones encontradas: 0</div>
+        <div id="results"></div>
+      </div>
+
+      <div class="footer-actions" style="margin-top: 16px;">
+        <div id="moreMeta" class="muted"></div>
+        <button id="moreBtn" class="secondary" onclick="loadMore()" style="display:none;">Más resultados</button>
+      </div>
+    </div>
   </div>
 
 <script>
-const N8N_WEBHOOK_URL = "https://napiercr.app.n8n.cloud/webhook/lexai-query";
+  /***********************
+   * CONFIG
+   ***********************/
+  const N8N_WEBHOOK_URL = "https://napiercr.app.n8n.cloud/webhook/lexai-query";
+  const PAGE_SIZE = 5;
 
-let currentQuery = "";
-let offset = 0;
-const limit = 5;
+  /***********************
+   * STATE
+   ***********************/
+  let currentQuery = "";
+  let offset = 0;
+  let totalCount = 0;
 
-function setStatus(text, isError = false) {
-  const el = document.getElementById("status");
-  el.textContent = text;
-  el.className = isError ? "error" : "";
-}
+  /***********************
+   * UI HELPERS
+   ***********************/
+  const elQ = document.getElementById("queryInput");
+  const elStatus = document.getElementById("status");
+  const elErr = document.getElementById("err");
+  const elSummary = document.getElementById("summary");
+  const elCount = document.getElementById("count");
+  const elResults = document.getElementById("results");
+  const elMoreBtn = document.getElementById("moreBtn");
+  const elMoreMeta = document.getElementById("moreMeta");
+  const btnSearch = document.getElementById("btnSearch");
+  const btnClear = document.getElementById("btnClear");
 
-async function callApi(query, offset, limit) {
-  const url = new URL(N8N_WEBHOOK_URL);
-  url.searchParams.set("query", query);
-  url.searchParams.set("offset", offset);
-  url.searchParams.set("limit", limit);
-
-  const res = await fetch(url.toString(), { method: "GET" });
-
-  if (!res.ok) {
-    throw new Error("HTTP " + res.status);
+  function setBusy(busy) {
+    btnSearch.disabled = busy;
+    btnClear.disabled = busy;
+    elMoreBtn.disabled = busy;
   }
 
-  return await res.json();
-}
-
-function renderResults(data, append = false) {
-  const container = document.getElementById("results");
-  if (!append) container.innerHTML = "";
-
-  if (!data || !data.items || data.items.length === 0) {
-    container.innerHTML = "<p>No se encontraron resoluciones.</p>";
-    document.getElementById("moreBtn").style.display = "none";
-    return;
+  function setStatus(text) {
+    elStatus.textContent = text || "";
   }
 
-  data.items.forEach(r => {
+  function setError(text) {
+    elErr.textContent = text || "";
+  }
+
+  function esc(s) {
+    return (s ?? "").toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function clearAll() {
+    currentQuery = "";
+    offset = 0;
+    totalCount = 0;
+
+    elQ.value = "";
+    setStatus("");
+    setError("");
+
+    elSummary.textContent = "Aún no hay resultados.";
+    elCount.textContent = "Cantidad de resoluciones encontradas: 0";
+    elResults.innerHTML = "";
+    elMoreBtn.style.display = "none";
+    elMoreMeta.textContent = "";
+    elQ.focus();
+  }
+
+  /***********************
+   * API (GET)
+   ***********************/
+  async function callApi(query, offset, limit) {
+    const url = new URL(N8N_WEBHOOK_URL);
+    url.searchParams.set("query", query);
+    url.searchParams.set("offset", String(offset));
+    url.searchParams.set("limit", String(limit));
+
+    const res = await fetch(url.toString(), { method: "GET" });
+
+    if (!res.ok) {
+      throw new Error("HTTP " + res.status);
+    }
+
+    // Debe ser JSON
+    return await res.json();
+  }
+
+  function normalizeItems(data) {
+    let items = data?.items;
+
+    // Si viene como string (por n8n), intentar parsearlo a JSON
+    if (typeof items === "string") {
+      try { items = JSON.parse(items); } catch { items = []; }
+    }
+
+    // Si no es array, forzar a array vacío
+    if (!Array.isArray(items)) items = [];
+
+    return items;
+  }
+
+  function normalizeBool(v) {
+    return v === true || v === "true" || v === 1 || v === "1";
+  }
+
+  function renderExecutiveSummary(query, total) {
+    if (total > 0) {
+      elSummary.innerHTML = `Se encontraron <b>${esc(total)}</b> resoluciones relevantes para “<b>${esc(query)}</b>”.`;
+    } else {
+      elSummary.innerHTML = `No se encontraron resoluciones relevantes para “<b>${esc(query)}</b>”.`;
+    }
+  }
+
+  function renderCount(total) {
+    elCount.innerHTML = `Cantidad de resoluciones encontradas: <b>${esc(total)}</b>`;
+  }
+
+  function renderItem(r) {
     const div = document.createElement("div");
     div.className = "result";
+
+    const link = r.download_url
+      ? `<a href="${esc(r.download_url)}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>`
+      : `<span class="muted">Sin enlace</span>`;
+
     div.innerHTML = `
       <div class="meta">
-        <strong>Resolución:</strong> ${r.numero_resolucion || "-"} |
-        <strong>Institución:</strong> ${r.institucion || "-"} |
-        <strong>Año:</strong> ${r.anio || "-"}
+        <strong>Resolución:</strong> ${esc(r.numero_resolucion || "-")} |
+        <strong>Institución:</strong> ${esc(r.institucion || "-")} |
+        <strong>Procedimiento:</strong> ${esc(r.numero_procedimiento || "-")} |
+        <strong>Año:</strong> ${esc(r.anio || "-")}
       </div>
-      <p>${r.summary || ""}</p>
-      <p><strong>Conclusión:</strong> ${r.final_conclusion || ""}</p>
-      <div class="tags">${r.tags || ""}</div>
-      <p>
-        <a href="${r.download_url}" target="_blank">Ver documento</a>
-      </p>
+
+      <div><strong>Resumen:</strong></div>
+      <div>${esc(r.summary || "")}</div>
+
+      <div style="margin-top:8px;"><strong>Conclusión final:</strong></div>
+      <div>${esc(r.final_conclusion || "")}</div>
+
+      <div class="tags">${esc(r.tags || "")}</div>
+
+      <div style="margin-top:8px;"><strong>Documento:</strong> ${link}</div>
     `;
-    container.appendChild(div);
+    return div;
+  }
+
+  function renderResults(data, append = false) {
+    const items = normalizeItems(data);
+
+    if (!append) elResults.innerHTML = "";
+
+    // Totales (si vienen)
+    const total = Number(data?.count_total ?? data?.count ?? totalCount ?? 0);
+    const returned = Number(data?.returned ?? items.length ?? 0);
+
+    // Actualizar resumen/contador SOLO al inicio
+    if (!append) {
+      totalCount = total;
+      renderExecutiveSummary(currentQuery, totalCount);
+      renderCount(totalCount);
+    }
+
+    if (items.length === 0) {
+      // Fallback útil mientras afinas n8n
+      elResults.innerHTML = `
+        <div class="muted">
+          No hay items para mostrar. Respuesta recibida:
+          <pre>${esc(JSON.stringify(data, null, 2))}</pre>
+        </div>
+      `;
+      elMoreBtn.style.display = "none";
+      elMoreMeta.textContent = "";
+      return;
+    }
+
+    items.forEach(r => elResults.appendChild(renderItem(r)));
+
+    // Paginación
+    const hasMore = normalizeBool(data?.has_more);
+
+    offset = Number(data?.offset ?? offset) + returned;
+
+    elMoreBtn.style.display = hasMore ? "inline-block" : "none";
+    if (totalCount > 0) {
+      elMoreMeta.textContent = `Mostrando ${Math.min(offset, totalCount)} de ${totalCount}.`;
+    } else {
+      elMoreMeta.textContent = "";
+    }
+  }
+
+  /***********************
+   * ACTIONS
+   ***********************/
+  async function startSearch() {
+    setError("");
+    setStatus("");
+
+    const q = (elQ.value || "").trim();
+    if (!q) {
+      setError("Escriba una consulta.");
+      return;
+    }
+
+    currentQuery = q;
+    offset = 0;
+    totalCount = 0;
+
+    setBusy(true);
+    setStatus("Buscando…");
+
+    try {
+      const data = await callApi(currentQuery, offset, PAGE_SIZE);
+      renderResults(data, false);
+      setStatus("Listo.");
+    } catch (e) {
+      setStatus("");
+      setError("Error al consultar el asistente. (Ver consola)");
+      console.error("ERROR REAL:", e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadMore() {
+    setError("");
+    setStatus("Cargando más resultados…");
+    setBusy(true);
+
+    try {
+      const data = await callApi(currentQuery, offset, PAGE_SIZE);
+      renderResults(data, true);
+      setStatus("Listo.");
+    } catch (e) {
+      setStatus("");
+      setError("Error al cargar más resultados. (Ver consola)");
+      console.error("ERROR REAL:", e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Enter para buscar
+  elQ.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") startSearch();
   });
 
-  document.getElementById("moreBtn").style.display =
-    data.has_more ? "inline-block" : "none";
-}
-
-async function startSearch() {
-  currentQuery = document.getElementById("queryInput").value.trim();
-  if (!currentQuery) return;
-
-  offset = 0;
-  setStatus("Buscando…");
-
-  try {
-    const data = await callApi(currentQuery, offset, limit);
-    renderResults(data);
-    setStatus("");
-    offset += limit;
- } catch (e) {
-    setStatus("Error al consultar el asistente. Ver consola.", true);
-    console.error("ERROR REAL:", e);
-  }
-}
-
-async function loadMore() {
-  setStatus("Cargando más resultados…");
-
-  try {
-    const data = await callApi(currentQuery, offset, limit);
-    renderResults(data, true);
-    setStatus("");
-    offset += limit;
-  } catch (e) {
-    setStatus("Error al cargar más resultados.", true);
-    console.error(e);
-  }
-}
+  clearAll();
 </script>
+
 </body>
 </html>
