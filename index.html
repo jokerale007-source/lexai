@@ -161,9 +161,9 @@ async function startSearch() {
     renderResults(data);
     setStatus("");
     offset += limit;
-  } catch (e) {
-    setStatus("Error al consultar el asistente.", true);
-    console.error(e);
+ } catch (e) {
+    setStatus("Error al consultar el asistente. Ver consola.", true);
+    console.error("ERROR REAL:", e);
   }
 }
 
