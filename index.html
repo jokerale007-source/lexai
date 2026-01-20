@@ -28,6 +28,10 @@
     pre { background:#f7f7f7; padding:10px; border-radius:8px; overflow:auto; font-size: 12px; }
     .footer-actions { margin-top: 14px; display:flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
     .muted { color:#6b7280; font-size: 12px; }
+
+    /* Debug panel */
+    details.debug { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
+    details.debug summary { cursor: pointer; font-weight: bold; color: #374151; }
   </style>
 </head>
 
@@ -59,6 +63,12 @@
         <div id="moreMeta" class="muted"></div>
         <button id="moreBtn" class="secondary" onclick="loadMore()" style="display:none;">Más resultados</button>
       </div>
+
+      <!-- Debug: solo visible si abres la página con ?debug=1 -->
+      <details id="debugPanel" class="debug" style="display:none;">
+        <summary>Debug</summary>
+        <pre id="debugPre" style="white-space:pre-wrap;"></pre>
+      </details>
     </div>
   </div>
 
@@ -89,6 +99,10 @@
   const elMoreMeta = document.getElementById("moreMeta");
   const btnSearch = document.getElementById("btnSearch");
   const btnClear = document.getElementById("btnClear");
+
+  const debugPanel = document.getElementById("debugPanel");
+  const debugPre = document.getElementById("debugPre");
+  const debugEnabled = new URLSearchParams(window.location.search).get("debug") === "1";
 
   function setBusy(busy) {
     btnSearch.disabled = busy;
@@ -127,6 +141,16 @@
     elResults.innerHTML = "";
     elMoreBtn.style.display = "none";
     elMoreMeta.textContent = "";
+
+    // Debug panel
+    if (debugEnabled) {
+      debugPanel.style.display = "block";
+      debugPre.textContent = "";
+    } else {
+      debugPanel.style.display = "none";
+      debugPre.textContent = "";
+    }
+
     elQ.focus();
   }
 
@@ -139,13 +163,17 @@
     url.searchParams.set("offset", String(offset));
     url.searchParams.set("limit", String(limit));
 
+    // Si estás en modo debug en la página, también lo pedimos al backend
+    if (debugEnabled) {
+      url.searchParams.set("debug", "1");
+    }
+
     const res = await fetch(url.toString(), { method: "GET" });
 
     if (!res.ok) {
       throw new Error("HTTP " + res.status);
     }
 
-    // Debe ser JSON
     return await res.json();
   }
 
@@ -157,9 +185,7 @@
       try { items = JSON.parse(items); } catch { items = []; }
     }
 
-    // Si no es array, forzar a array vacío
     if (!Array.isArray(items)) items = [];
-
     return items;
   }
 
@@ -208,6 +234,12 @@
     return div;
   }
 
+  function renderDebug(data) {
+    if (!debugEnabled) return;
+    debugPanel.style.display = "block";
+    debugPre.textContent = JSON.stringify(data, null, 2);
+  }
+
   function renderResults(data, append = false) {
     const items = normalizeItems(data);
 
@@ -224,16 +256,11 @@
       renderCount(totalCount);
     }
 
+    // Si NO hay items, no mostramos JSON crudo.
     if (items.length === 0) {
-      // Fallback útil mientras afinas n8n
-      elResults.innerHTML = `
-        <div class="muted">
-          No hay items para mostrar. Respuesta recibida:
-          <pre>${esc(JSON.stringify(data, null, 2))}</pre>
-        </div>
-      `;
       elMoreBtn.style.display = "none";
       elMoreMeta.textContent = "";
+      renderDebug(data);
       return;
     }
 
@@ -241,7 +268,6 @@
 
     // Paginación
     const hasMore = normalizeBool(data?.has_more);
-
     offset = Number(data?.offset ?? offset) + returned;
 
     elMoreBtn.style.display = hasMore ? "inline-block" : "none";
@@ -250,6 +276,8 @@
     } else {
       elMoreMeta.textContent = "";
     }
+
+    renderDebug(data);
   }
 
   /***********************
